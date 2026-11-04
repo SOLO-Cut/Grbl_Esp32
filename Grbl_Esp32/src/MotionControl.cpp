@@ -303,6 +303,9 @@ void mc_homing_cycle() {
     // Machine X: 0 at a negative-end switch, $130 at a positive-end switch, minus the pull-off.
     float home_x         = negative ? pulloff : (settings.x_max_travel - pulloff);
     sys_position[X_AXIS] = lroundf(home_x * settings.steps_per_mm[X_AXIS]);
+    // Y (sheet transport) and Z (feed roller) have no switches: homing zeroes them.
+    sys_position[Y_AXIS] = 0;
+    sys_position[Z_AXIS] = 0;
     sys.state            = (saved == State::Alarm) ? State::Idle : saved;
     gc_sync_position();
     plan_sync_position();

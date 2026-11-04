@@ -198,7 +198,9 @@ In G-code the feed roller is the **Z** axis. Positive Y moves the sheet
 paper **into** the machine. If your wiring runs an axis backwards, fix it
 with `$3` (direction invert mask) rather than in G-code.
 
-**Homing (`$H`).** Only X homes; Y and Z are not touched.
+**Homing (`$H`).** Only X physically moves. When X homing succeeds, machine
+Y and Z are set to 0 without moving them. If homing fails, Y and Z are left
+unchanged.
 
 * With `$23` bit0 = 1 (default), the switch is at the X = 0 end. The carriage
   seeks toward −X at `$25`, backs off by `$27`, re-approaches slowly at
