@@ -34,9 +34,14 @@
 #define Z_STEP_PIN 15  // Feed roller ("feed motor")
 #define Z_DIRECTION_PIN 16
 
-// Shared stepper enable, active low. With $4=0 the pin is driven LOW to
-// enable the drivers and HIGH to disable them.
-#define STEPPERS_DISABLE_PIN 21
+// One enable pin per driver, active low by default. With $4 bit = 0 the pin
+// is driven LOW to enable that driver and HIGH to disable it. $4 is a mask
+// (bit0 X, bit1 Y, bit2 Z), so each driver can have its own polarity.
+// Any output-capable GPIO works here (0..21, 26..48); avoid strapping pins
+// (0, 3, 45, 46), USB (19, 20) and flash/PSRAM pins (26..32 on the N8R2).
+#define X_ENABLE_PIN 21
+#define Y_ENABLE_PIN 38
+#define Z_ENABLE_PIN 39
 
 // ----------------------------------------------------------------------------
 // Inputs. All inputs use the internal pull-up and are active LOW by default

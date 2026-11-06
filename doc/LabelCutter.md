@@ -69,7 +69,9 @@ Grbl_Esp32/
 | 7 | Y direction | |
 | 15 | Z step | Feed roller ("feed motor") |
 | 16 | Z direction | |
-| 21 | Stepper enable (shared) | Active low: LOW = drivers enabled (`$4=0`) |
+| 21 | X driver enable | Active low: LOW = driver enabled (`$4` bit0 = 0) |
+| 38 | Y driver enable | Active low (`$4` bit1 = 0) |
+| 39 | Z driver enable | Active low (`$4` bit2 = 0) |
 | 8 | X limit switch | Switch to GND, internal pull-up, active LOW |
 | 9 | Paper-present IR sensor | Internal pull-up, active LOW |
 | 10 | Rear IR sensor | Internal pull-up, active LOW |
@@ -89,8 +91,8 @@ without recompiling:
 * `$305` is a bit mask for the sensors (bit0 paper, bit1 rear, bit2 front). A
   set bit makes that sensor active HIGH.
 
-If you rewire, edit only `src/Config.h`. Step, direction, enable, sensor,
-limit and head pins must stay in GPIO 0–31. The ISRs use the 32-bit GPIO
+If you rewire, edit only `src/Config.h`. Step, direction, sensor, limit and head
+pins must stay in GPIO 0–31 (enable pins may use any output GPIO up to 48). The ISRs use the 32-bit GPIO
 set/clear registers, and the code has compile-time `static_assert`s that
 check this.
 
@@ -391,7 +393,7 @@ Inside `$FEED` the sequence handles paper-out itself (steps 3 and 4 above).
 | 1 | 250 | Step idle delay, ms, before the drivers are disabled (255 = always on) |
 | 2 | 0 | Step pulse invert mask (bit0 X, bit1 Y, bit2 Z) |
 | 3 | 0 | Direction invert mask |
-| 4 | 0 | Invert stepper enable (0 = active-low enable on GPIO21) |
+| 4 | 0 | Stepper enable invert mask (bit0 X, bit1 Y, bit2 Z; 0 = active-low enable) |
 | 5 | 0 | Invert X limit (0 = active LOW) |
 | 10 | 1 | Status mask: bit0 = report MPos (else WPos), bit1 = add `Bf:` |
 | 11 | 0.010 | Junction deviation, mm |
