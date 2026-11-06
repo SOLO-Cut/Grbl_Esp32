@@ -192,7 +192,7 @@ struct settings_t {
     uint8_t  idle_lock_ms;      // $1  (255 = keep enabled)
     uint8_t  step_invert;       // $2
     uint8_t  dir_invert;        // $3
-    uint8_t  enable_invert;     // $4  mask: bit0 X, bit1 Y, bit2 Z (1 = active-high enable)
+    uint8_t  enable_invert;     // $4
     uint8_t  limit_invert;      // $5  0 = X limit active LOW
     uint8_t  status_mask;       // $10
     float    junction_dev;      // $11

@@ -52,7 +52,7 @@ ALARMS = {
 }
 SETTINGS = {
     0: "Step pulse, us", 1: "Step idle delay, ms", 2: "Step invert mask",
-    3: "Direction invert mask", 4: "Enable invert mask (X,Y,Z)", 5: "Invert X limit",
+    3: "Direction invert mask", 4: "Invert stepper enable", 5: "Invert X limit",
     10: "Status report mask", 11: "Junction deviation, mm", 12: "Arc tolerance, mm",
     13: "Report inches", 20: "Soft limits (X)", 21: "Hard limit (X)",
     22: "Homing enable", 23: "Homing dir mask (bit0: switch at X=0)",

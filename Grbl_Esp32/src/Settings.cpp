@@ -83,7 +83,7 @@ static const SettingDesc table[] = {
     S(1, U8, idle_lock_ms, 0, 255),
     S(2, Mask, step_invert, 0, 7),
     S(3, Mask, dir_invert, 0, 7),
-    S(4, Mask, enable_invert, 0, 7),
+    S(4, Bool, enable_invert, 0, 1),
     S(5, Bool, limit_invert, 0, 1),
     S(10, U8, status_mask, 0, 3),
     S(11, Float, junction_dev, 0, 10),

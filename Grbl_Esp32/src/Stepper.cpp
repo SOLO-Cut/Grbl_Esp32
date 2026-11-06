@@ -30,9 +30,7 @@
 
 static_assert(X_STEP_PIN < 32 && Y_STEP_PIN < 32 && Z_STEP_PIN < 32, "Step pins must be GPIO0..31");
 static_assert(X_DIRECTION_PIN < 32 && Y_DIRECTION_PIN < 32 && Z_DIRECTION_PIN < 32, "Dir pins must be GPIO0..31");
-static_assert(X_ENABLE_PIN < 49 && Y_ENABLE_PIN < 49 && Z_ENABLE_PIN < 49, "Enable pins must be GPIO0..48");
-static_assert(X_ENABLE_PIN != Y_ENABLE_PIN && X_ENABLE_PIN != Z_ENABLE_PIN && Y_ENABLE_PIN != Z_ENABLE_PIN,
-              "Each driver needs its own enable pin");
+static_assert(STEPPERS_DISABLE_PIN < 32, "Enable pin must be GPIO0..31");
 static_assert(PAPER_SENSOR_PIN < 32, "Paper sensor must be GPIO0..31");
 
 // Step timer
@@ -48,7 +46,6 @@ static const int      RAMP_DECEL_OVERRIDE = 3;
 
 static const uint32_t step_pin_mask[N_AXIS] = { bit(X_STEP_PIN), bit(Y_STEP_PIN), bit(Z_STEP_PIN) };
 static const uint32_t dir_pin_mask[N_AXIS]  = { bit(X_DIRECTION_PIN), bit(Y_DIRECTION_PIN), bit(Z_DIRECTION_PIN) };
-static const uint8_t  enable_pin[N_AXIS]    = { X_ENABLE_PIN, Y_ENABLE_PIN, Z_ENABLE_PIN };
 
 struct PrepFlag {
     uint8_t recalculate : 1;
@@ -165,20 +162,12 @@ static inline void IRAM_ATTR busy_wait_us(uint32_t us) {
     }
 }
 
-// Drives one GPIO from ISR context; handles both banks (GPIO0..31 and 32..48).
-static inline void IRAM_ATTR write_pin(uint8_t pin, bool level) {
-    if (pin < 32) {
-        REG_WRITE(level ? GPIO_OUT_W1TS_REG : GPIO_OUT_W1TC_REG, bit(pin));
-    } else {
-        REG_WRITE(level ? GPIO_OUT1_W1TS_REG : GPIO_OUT1_W1TC_REG, bit(pin - 32));
-    }
-}
-
 void IRAM_ATTR st_disable_motors(bool disable) {
-    for (int axis = 0; axis < N_AXIS; axis++) {
-        // Default ($4 bit = 0): HIGH = disabled (active-low enable)
-        bool level = disable ^ (((settings.enable_invert >> axis) & 1) != 0);
-        write_pin(enable_pin[axis], level);
+    bool level = disable ^ (settings.enable_invert != 0);  // Default: HIGH = disabled (active-low enable)
+    if (level) {
+        REG_WRITE(GPIO_OUT_W1TS_REG, bit(STEPPERS_DISABLE_PIN));
+    } else {
+        REG_WRITE(GPIO_OUT_W1TC_REG, bit(STEPPERS_DISABLE_PIN));
     }
 }
 
@@ -324,9 +313,7 @@ static bool IRAM_ATTR onStepTimer(gptimer_handle_t timer, const gptimer_alarm_ev
 // Public interface
 // ---------------------------------------------------------------------------
 void stepper_init() {
-    st_disable_motors(true);  // Latch "disabled" before the enable pins become outputs
-    const int pins[] = { X_STEP_PIN,   Y_STEP_PIN,   Z_STEP_PIN,  X_DIRECTION_PIN, Y_DIRECTION_PIN,
-                         Z_DIRECTION_PIN, X_ENABLE_PIN, Y_ENABLE_PIN, Z_ENABLE_PIN };
+    const int pins[] = { X_STEP_PIN, Y_STEP_PIN, Z_STEP_PIN, X_DIRECTION_PIN, Y_DIRECTION_PIN, Z_DIRECTION_PIN, STEPPERS_DISABLE_PIN };
     for (int pin : pins) {
         pinMode(pin, OUTPUT);
     }
