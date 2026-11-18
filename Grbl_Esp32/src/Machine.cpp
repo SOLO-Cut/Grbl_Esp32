@@ -11,6 +11,8 @@
   --------
   * Heads   : two solenoids on LEDC PWM (1 kHz). Mutually exclusive in software
               (the other head is always switched off first, immediately).
+              HEAD_EN_PIN switches their shared supply: on while a head is
+              energised, off together with the head for a fast release.
   * Fans    : two LEDC PWM outputs (25 kHz), 0-100 %.
   * Sensors : paper-present, rear and front IR sensors on GPIO interrupts.
   * Sequences ($EJECT, $FEED): every "move until sensor X changes" step is
@@ -65,6 +67,13 @@ static void head_off(int i) {
     ledc_stop(LEDC_LOW_SPEED_MODE, HEAD_CH[i], 0);  // Immediate, output held low
 }
 
+// Shared head supply (high-side switch). Off = fast release of an energised coil.
+static void head_supply(bool on) {
+#if HEAD_EN_PIN >= 0
+    gpio_set_level((gpio_num_t)HEAD_EN_PIN, on ? 1 : 0);
+#endif
+}
+
 static void head_duty(int i, uint32_t duty) {
     ledc_set_duty(LEDC_LOW_SPEED_MODE, HEAD_CH[i], duty);
     ledc_update_duty(LEDC_LOW_SPEED_MODE, HEAD_CH[i]);
@@ -83,6 +92,7 @@ void heads_set(HeadState head, float power) {
     // Mutual exclusion: both heads are switched off before one is switched on.
     head_off(0);
     head_off(1);
+    head_supply(false);  // Together with the low side: fast release
     head_state = HeadState::Off;
     if (head == HeadState::Off) {
         return;
@@ -99,6 +109,7 @@ void heads_set(HeadState head, float power) {
     }
     int i      = head == HeadState::Head1 ? 0 : 1;
     head_state = head;
+    head_supply(true);
     if (settings.head_pullin_ms && head_hold_duty < HEAD_MAX) {
         head_duty(i, HEAD_MAX);  // Full-power pull-in, then drop to the hold duty
         esp_timer_start_once(pullin_timer, (uint64_t)settings.head_pullin_ms * 1000);
@@ -115,9 +126,15 @@ void heads_sync(HeadState head, float power) {
     heads_set(head, power);
 }
 
-// ISR-safe emergency off: detach both pins from LEDC and drive them low.
+// ISR-safe emergency off: detach both pins from LEDC and drive them low, and switch
+// the shared head supply off.
 void IRAM_ATTR heads_kill() {
     REG_WRITE(GPIO_OUT_W1TC_REG, bit(HEAD1_PIN) | bit(HEAD2_PIN));
+#if HEAD_EN_PIN >= 32
+    REG_WRITE(GPIO_OUT1_W1TC_REG, bit(HEAD_EN_PIN - 32));
+#elif HEAD_EN_PIN >= 0
+    REG_WRITE(GPIO_OUT_W1TC_REG, bit(HEAD_EN_PIN));
+#endif
     esp_rom_gpio_connect_out_signal(HEAD1_PIN, SIG_GPIO_OUT_IDX, false, false);
     esp_rom_gpio_connect_out_signal(HEAD2_PIN, SIG_GPIO_OUT_IDX, false, false);
     head_state = HeadState::Off;
@@ -280,6 +297,13 @@ void machine_init() {
     ft.timer_num           = LEDC_TIMER_1;
     ft.freq_hz             = FAN_PWM_FREQ;
     ESP_ERROR_CHECK(ledc_timer_config(&ft));
+
+#if HEAD_EN_PIN >= 0
+    // Head supply switch: plain GPIO output, off (the board pulls it low until here)
+    gpio_reset_pin((gpio_num_t)HEAD_EN_PIN);
+    gpio_set_level((gpio_num_t)HEAD_EN_PIN, 0);
+    gpio_set_direction((gpio_num_t)HEAD_EN_PIN, GPIO_MODE_OUTPUT);
+#endif
 
     esp_timer_create_args_t targs = {};
     targs.callback                = pullin_done;

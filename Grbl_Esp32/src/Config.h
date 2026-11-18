@@ -58,6 +58,10 @@
 // ----------------------------------------------------------------------------
 #define HEAD1_PIN 12  // Head 1 solenoid  (M3)
 #define HEAD2_PIN 13  // Head 2 solenoid  (M4) - never on together with head 1
+// Shared high-side switch of both solenoids (main board Q322, HEAD_EN). HIGH = heads
+// powered. It is switched off together with the head, so the coil current collapses
+// through the release diode (fast head release). -1 = board without the switch.
+#define HEAD_EN_PIN 40
 #define FAN1_PIN 14   // Fan 1 (M67/M68 E0)
 #define FAN2_PIN 1    // Fan 2 (M67/M68 E1)
 

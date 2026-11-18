@@ -78,6 +78,7 @@ Grbl_Esp32/
 | 11 | Front IR sensor | Internal pull-up, active LOW |
 | 12 | Head 1 solenoid | PWM 1 kHz, 12-bit |
 | 13 | Head 2 solenoid | PWM 1 kHz, 12-bit, never on together with head 1 |
+| 40 | Head supply switch (`HEAD_EN`) | HIGH while a head is energised, LOW with the head for a fast release |
 | 14 | Fan 1 | PWM 25 kHz, 10-bit |
 | 1 | Fan 2 | PWM 25 kHz, 10-bit |
 | 17 / 18 | UART1 TX / RX | Master controller link, 115200 8N1 |
@@ -264,12 +265,22 @@ and M4 are in the same modal group, the parser can never request both. An
 emergency stop (reset, alarm, hard limit) disconnects both pins from the PWM
 peripheral and drives them low from the ISR.
 
+Both solenoids are fed through a shared high-side switch (`HEAD_EN_PIN`,
+GPIO40). It is switched on just before a head is energised and off together
+with the head. With both switches off the coil current collapses through the
+release diode (the coil sees about -25 V instead of -0.5 V), so the head
+releases about 5x faster than with a flyback diode alone. During the PWM hold
+the switch stays on and the current freewheels slowly, so holding costs no
+extra power.
+
 Optional solenoid tuning:
 
 * `$307` pull-in: the solenoid is driven at 100 % for `$307` ms, then drops
   to the S hold duty.
 * `$308` switch delay: when switching directly from head 1 to head 2 (or the
   reverse), the firmware waits `$308` ms after the first head is released.
+  With the fast release about 1-2 ms is enough; at 0 the head supply is
+  switched straight back on and the first head releases at the slow rate.
 
 ### Fans
 
