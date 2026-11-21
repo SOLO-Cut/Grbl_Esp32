@@ -49,6 +49,8 @@ static const uint32_t       FAN_MAX     = (1u << FAN_PWM_RES_BITS) - 1;
 static volatile HeadState head_state = HeadState::Off;
 static uint32_t           head_hold_duty;
 static esp_timer_handle_t pullin_timer;
+static volatile HeadState pullin_head = HeadState::Off;  // Head the pull-in timer is armed for
+static portMUX_TYPE       head_mux    = portMUX_INITIALIZER_UNLOCKED;
 static float              fan_percent[2];
 
 static void channel_config(ledc_channel_t ch, int pin, ledc_timer_t timer) {
@@ -79,21 +81,30 @@ static void head_duty(int i, uint32_t duty) {
     ledc_update_duty(LEDC_LOW_SPEED_MODE, HEAD_CH[i]);
 }
 
-static void pullin_done(void* arg) {
+// End of the full-power pull-in: drop to the hold duty. Runs in the esp_timer task
+// (core 0) while heads_set() runs on core 1, so both hold head_mux: the hold duty is
+// only applied to the head the timer was armed for, and never after a switch-off.
+static void pullin_done(void*) {
+    portENTER_CRITICAL(&head_mux);
     HeadState h = head_state;
-    if (h != HeadState::Off && (uintptr_t)arg == (uintptr_t)h) {
+    if (h != HeadState::Off && h == pullin_head) {
         head_duty(h == HeadState::Head1 ? 0 : 1, head_hold_duty);
     }
+    pullin_head = HeadState::Off;
+    portEXIT_CRITICAL(&head_mux);
 }
 
 void heads_set(HeadState head, float power) {
     esp_timer_stop(pullin_timer);
+    portENTER_CRITICAL(&head_mux);
+    pullin_head        = HeadState::Off;
     HeadState previous = head_state;
     // Mutual exclusion: both heads are switched off before one is switched on.
     head_off(0);
     head_off(1);
     head_supply(false);  // Together with the low side: fast release
     head_state = HeadState::Off;
+    portEXIT_CRITICAL(&head_mux);
     if (head == HeadState::Off) {
         return;
     }
@@ -107,14 +118,16 @@ void heads_set(HeadState head, float power) {
     if (previous != HeadState::Off && previous != head && settings.head_switch_ms) {
         delay_msec(settings.head_switch_ms);  // Let the other solenoid release
     }
-    int i      = head == HeadState::Head1 ? 0 : 1;
+    int  i      = head == HeadState::Head1 ? 0 : 1;
+    bool pullin = settings.head_pullin_ms && head_hold_duty < HEAD_MAX;
+    portENTER_CRITICAL(&head_mux);
     head_state = head;
     head_supply(true);
-    if (settings.head_pullin_ms && head_hold_duty < HEAD_MAX) {
-        head_duty(i, HEAD_MAX);  // Full-power pull-in, then drop to the hold duty
+    head_duty(i, pullin ? HEAD_MAX : head_hold_duty);  // Full-power pull-in, then the hold duty
+    pullin_head = pullin ? head : HeadState::Off;
+    portEXIT_CRITICAL(&head_mux);
+    if (pullin) {
         esp_timer_start_once(pullin_timer, (uint64_t)settings.head_pullin_ms * 1000);
-    } else {
-        head_duty(i, head_hold_duty);
     }
 }
 
@@ -321,6 +334,7 @@ void machine_reset() {
     if (pullin_timer) {
         esp_timer_stop(pullin_timer);
     }
+    pullin_head = HeadState::Off;
     heads_kill();
     for (int i = 0; i < 2; i++) {
         channel_config(HEAD_CH[i], HEAD_PIN[i], LEDC_TIMER_0);
